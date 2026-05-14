@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MedVault — Records</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark">✚</div><div><span class="logo-text">MedVault</span><span class="logo-version">Health Records</span></div></div>
+  <nav class="nav">
+    <span class="nav-label">Main</span>
+    <a href="{{ url_for('index') }}"   class="nav-item"><div class="nav-icon">◈</div><span>Dashboard</span></a>
+    <a href="{{ url_for('patient') }}" class="nav-item"><div class="nav-icon">◉</div><span>Patient Profile</span></a>
+    <span class="nav-label">Medical</span>
+    <a href="{{ url_for('records') }}" class="nav-item active"><div class="nav-icon">◧</div><span>Records</span></a>
+    <a href="{{ url_for('health') }}"  class="nav-item"><div class="nav-icon">◎</div><span>Health Summary</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="{{ url_for('patient') }}" class="patient-chip">
+      <div class="chip-avatar">?</div>
+      <div><span class="chip-name">—</span><span class="chip-tag">—</span></div>
+    </a>
+  </div>
+</aside>
+<main class="main">
+  <header class="page-header">
+    <div><div class="header-eyebrow">Manage</div><h1 class="page-title">Medical Records</h1></div>
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for cat,msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}{% endif %}
+  {% endwith %}
+  <div class="records-layout">
+    <!-- Upload Card -->
+    <section class="card upload-card" style="--delay:0.1s">
+      <div class="card-header"><h2 class="card-title">Upload New Record</h2></div>
+      <form method="POST" action="{{ url_for('records') }}" enctype="multipart/form-data" id="uploadForm">
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <input type="file" name="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg" style="display:none" onchange="handleFile(this)" required>
+          <span class="drop-icon">⬆</span>
+          <p class="drop-title">Drop file or click to browse</p>
+          <p class="drop-hint">PDF, PNG, JPG — up to 16MB</p>
+          <div class="drop-preview" id="dprev" style="display:none">
+            <span class="drop-file-name" id="dfname"></span>
+            <button type="button" class="drop-clear" onclick="clearFile(event)">✕</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:14px">
+          <label class="form-label">Record Name *</label>
+          <input type="text" name="file_name" id="recName" class="form-input" placeholder="e.g. Blood Test March 2025" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <div class="cat-selector">
+            {% for cat in categories %}
+            <label class="cat-btn-label">
+              <input type="radio" name="category_id" value="{{ cat.id }}" {{ 'checked' if loop.first }} style="display:none">
+              <span class="cat-btn {{ 'active' if loop.first }}" onclick="selCat(this)">
+                {% if cat.name=='Prescription' %}💊{% elif cat.name=='Lab Report' %}🧪{% elif cat.name=='Scan' %}📷{% else %}📁{% endif %} {{ cat.name }}
+              </span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        <button type="submit" class="btn-primary full-btn">Upload Record</button>
+      </form>
+    </section>
+
+    <!-- Records List -->
+    <section class="card records-list-card" style="--delay:0.2s">
+      <div class="card-header">
+        <h2 class="card-title">All Records</h2>
+        <div class="filter-row">
+          <a href="{{ url_for('records') }}" class="filter-btn {{ 'active' if cat_filter=='all' }}">All</a>
+          {% for cat in categories %}
+          <a href="{{ url_for('records',cat=cat.name) }}" class="filter-btn {{ 'active' if cat_filter==cat.name }}">
+            {% if cat.name=='Prescription' %}Rx{% elif cat.name=='Lab Report' %}Lab{% else %}{{ cat.name }}{% endif %}
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if records %}
+        {% for rec in records %}
+        <div class="record-row" id="rec-{{ rec.id }}">
+          <div class="record-icon">{% if rec.cat_name=='Prescription' %}💊{% elif rec.cat_name=='Lab Report' %}🧪{% elif rec.cat_name=='Scan' %}📷{% else %}📁{% endif %}</div>
+          <div class="record-info" style="flex:1;min-width:0">
+            <span class="record-name">{{ rec.file_name }}</span>
+            <span class="record-meta">{{ rec.upload_date[:10] }} · {{ rec.file_path }}</span>
+            <!-- AI Summary output -->
+            <div id="ai-out-{{ rec.id }}" style="display:none"></div>
+          </div>
+          <div class="record-right" style="flex-shrink:0;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+            <span class="record-tag {{ rec.cat_name.lower().replace(' ','-') }}">{{ rec.cat_name }}</span>
+            <button class="ai-btn" style="margin-top:0;padding:7px 12px;font-size:0.76rem"
+                    onclick="aiSummarize({{ rec.id }}, '{{ rec.file_name }}', '{{ rec.cat_name }}', '{{ rec.file_path }}')"
+                    id="aibtn-{{ rec.id }}">✦ AI Summary</button>
+            <a href="{{ url_for('export_record',record_id=rec.id) }}" class="record-export" title="Export PDF">⬇</a>
+            <form method="POST" action="{{ url_for('delete_record',record_id=rec.id) }}" style="display:inline" onsubmit="return confirm('Delete this record?')">
+              <button type="submit" class="record-del" title="Delete">✕</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state"><span class="empty-icon">◧</span><p>No records in this category.</p></div>
+      {% endif %}
+    </section>
+  </div>
+</main>
+
+<script>
+const dropZone=document.getElementById('dropZone');
+dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag-over')});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag-over');if(e.dataTransfer.files[0])setFile(e.dataTransfer.files[0])});
+function handleFile(i){if(i.files[0])setFile(i.files[0])}
+function setFile(f){document.getElementById('dprev').style.display='flex';document.getElementById('dfname').textContent=f.name;dropZone.classList.add('has-file');const nm=document.getElementById('recName');if(!nm.value)nm.value=f.name.replace(/\.[^.]+$/,'')}
+function clearFile(e){e.stopPropagation();document.getElementById('dprev').style.display='none';dropZone.classList.remove('has-file');document.getElementById('fileInput').value=''}
+function selCat(s){document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));s.classList.add('active');s.closest('label').querySelector('input').checked=true}
+
+// ── ✅ FIXED AI SUMMARY (ONLY CHANGE) ──
+async function aiSummarize(recId, fileName, catName, filePath) {
+  const btn = document.getElementById('aibtn-'+recId);
+  const out = document.getElementById('ai-out-'+recId);
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  out.style.display = 'block';
+  out.innerHTML = `<div class="ai-panel"><div class="ai-panel-head"><span class="ai-badge">✦ AI</span><span class="ai-panel-title">Generating summary…</span></div><div class="ai-loading"><div class="ai-spinner"></div>Analyzing record…</div></div>`;
+
+  const prompt = `You are a medical AI assistant helping patients understand their health records.
+
+Record Name: "${fileName}"
+Category: "${catName}"
+File: "${filePath}"
+
+Generate a clear, helpful summary for a patient.`;
+
+  try {
+    // ✅ CHANGED HERE ONLY
+    const response = await fetch('/ai-summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
+
+    const data = await response.json();
+    const text = data.result || 'Unable to generate summary.';
+
+    const formatted = text
+      .split('\n\n')
+      .filter(p=>p.trim())
+      .map(p=>`<p>${p.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>')}</p>`)
+      .join('');
+
+    out.innerHTML = `<div class="ai-panel"><div class="ai-panel-head"><span class="ai-badge">✦ AI</span><span class="ai-panel-title">AI Summary — ${fileName}</span></div><div class="ai-panel-body">${formatted}</div></div>`;
+    btn.textContent = '✦ Refresh';
+    btn.disabled = false;
+
+  } catch(err) {
+    out.innerHTML = `<div class="ai-panel"><div class="ai-panel-head"><span class="ai-badge">✦ AI</span><span class="ai-panel-title">Error</span></div><div class="ai-panel-body"><p style="color:var(--danger)">Could not generate summary.</p></div></div>`;
+    btn.textContent = '✦ Retry';
+    btn.disabled = false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.flash').forEach(el=>{setTimeout(()=>{el.style.transition='opacity 0.5s';el.style.opacity='0';setTimeout(()=>el.remove(),500)},4000)});
+});
+</script>
+</body>
+</html>

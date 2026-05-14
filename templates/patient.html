@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MedVault — Patient Profile</title>
+<link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}">
+</head>
+<body>
+<aside class="sidebar">
+  <div class="logo"><div class="logo-mark">✚</div><div><span class="logo-text">MedVault</span><span class="logo-version">Health Records</span></div></div>
+  <nav class="nav">
+    <span class="nav-label">Main</span>
+    <a href="{{ url_for('index') }}"   class="nav-item"><div class="nav-icon">◈</div><span>Dashboard</span></a>
+    <a href="{{ url_for('patient') }}" class="nav-item active"><div class="nav-icon">◉</div><span>Patient Profile</span></a>
+    <span class="nav-label">Medical</span>
+    <a href="{{ url_for('records') }}" class="nav-item"><div class="nav-icon">◧</div><span>Records</span></a>
+    <a href="{{ url_for('health') }}"  class="nav-item"><div class="nav-icon">◎</div><span>Health Summary</span></a>
+  </nav>
+  <div class="sidebar-footer">
+    <a href="{{ url_for('patient') }}" class="patient-chip">
+      <div class="chip-avatar">{{ patient.name[0].upper() if patient else '?' }}</div>
+      <div><span class="chip-name">{{ patient.name if patient else 'No Profile' }}</span><span class="chip-tag">{{ patient.blood_group if patient and patient.blood_group else 'Set up profile →' }}</span></div>
+    </a>
+  </div>
+</aside>
+<main class="main">
+  <header class="page-header">
+    <div><div class="header-eyebrow">Manage</div><h1 class="page-title">Patient Profile</h1></div>
+  </header>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for cat,msg in messages %}<div class="flash flash-{{ cat }}">{{ msg }}</div>{% endfor %}{% endif %}
+  {% endwith %}
+  <div class="form-layout">
+    <section class="card" style="--delay:0.1s">
+      <div class="card-header"><h2 class="card-title">Personal Information</h2></div>
+      <div class="form-avatar-row">
+        <div class="form-avatar" id="fmAv">{{ patient.name[0].upper() if patient else '?' }}</div>
+        <div><p style="font-size:0.9rem;font-weight:500;color:var(--text);margin-bottom:3px">Profile Photo</p><p class="form-avatar-hint">Your initial appears based on your name</p></div>
+      </div>
+      <form method="POST" action="{{ url_for('patient') }}">
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Full Name *</label><input type="text" name="name" id="iName" class="form-input" placeholder="e.g. Arjun Sharma" value="{{ patient.name if patient else '' }}" oninput="lp()" required></div>
+          <div class="form-group"><label class="form-label">Age</label><input type="number" name="age" id="iAge" class="form-input" placeholder="28" min="1" max="120" value="{{ patient.age if patient else '' }}" oninput="lp()"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label">Gender</label>
+            <select name="gender" id="iGender" class="form-input" onchange="lp()">
+              <option value="">Select gender</option>
+              {% for g in ['Male','Female','Other'] %}<option {{ 'selected' if patient and patient.gender==g }}>{{ g }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">Blood Group</label>
+            <select name="blood_group" id="iBlood" class="form-input" onchange="lp()">
+              <option value="">Select</option>
+              {% for bg in ['A+','A−','B+','B−','AB+','AB−','O+','O−'] %}<option {{ 'selected' if patient and patient.blood_group==bg }}>{{ bg }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group"><label class="form-label">Emergency Contact</label><input type="tel" name="emergency_contact" id="iEmergency" class="form-input" placeholder="+91 98765 43210" value="{{ patient.emergency_contact if patient else '' }}" oninput="lp()"></div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Save Profile</button>
+          <a href="{{ url_for('index') }}" class="btn-ghost">Cancel</a>
+        </div>
+      </form>
+    </section>
+
+    <section class="card preview-card" style="--delay:0.2s">
+      <div class="card-header"><h2 class="card-title">Live Preview</h2></div>
+      <div class="profile-preview">
+        <div class="preview-avatar" id="pvAv">{{ patient.name[0].upper() if patient else '?' }}</div>
+        <h3 class="preview-name" id="pvNm">{{ patient.name if patient else '—' }}</h3>
+        <div class="preview-blood" id="pvBlood">{{ patient.blood_group if patient and patient.blood_group else '—' }}</div>
+        <div class="preview-details">
+          <div class="preview-row"><span class="preview-key">Age</span><span class="preview-val" id="pvAge">{{ (patient.age|string+' yrs') if patient and patient.age else '—' }}</span></div>
+          <div class="preview-row"><span class="preview-key">Gender</span><span class="preview-val" id="pvGender">{{ patient.gender if patient and patient.gender else '—' }}</span></div>
+          <div class="preview-row"><span class="preview-key">Emergency</span><span class="preview-val" id="pvEmergency">{{ patient.emergency_contact if patient and patient.emergency_contact else '—' }}</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+<script>
+function lp(){
+  const n=document.getElementById('iName').value||'—';
+  const ag=document.getElementById('iAge').value;
+  const ge=document.getElementById('iGender').value;
+  const bl=document.getElementById('iBlood').value;
+  const em=document.getElementById('iEmergency').value;
+  document.getElementById('pvNm').textContent=n;
+  document.getElementById('pvAv').textContent=n!=='—'?n[0].toUpperCase():'?';
+  document.getElementById('fmAv').textContent=n!=='—'?n[0].toUpperCase():'?';
+  document.getElementById('pvAge').textContent=ag?ag+' yrs':'—';
+  document.getElementById('pvGender').textContent=ge||'—';
+  document.getElementById('pvBlood').textContent=bl||'—';
+  document.getElementById('pvEmergency').textContent=em||'—';
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  document.querySelectorAll('.flash').forEach(el=>{setTimeout(()=>{el.style.transition='opacity 0.5s';el.style.opacity='0';setTimeout(()=>el.remove(),500)},4000)});
+});
+</script>
+</body>
+</html>
